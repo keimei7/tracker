@@ -18,6 +18,7 @@ import {
   query,
   where,
   getDocs,
+  deleteDoc,
 } from "firebase/firestore";
 
 type UserProfile = {
@@ -33,6 +34,7 @@ type Vehicle = {
   vehicleName: string;
   nickname?: string;
   plateNumber?: string;
+  isReservable?: boolean;
   createdAt?: unknown;
 };
 
@@ -46,6 +48,15 @@ type LogItem = {
   distance: number;
   fueled: boolean;
   comment?: string;
+  createdAt?: unknown;
+};
+
+type Reservation = {
+  id: string;
+  companyId: string;
+  userId: string;
+  vehicleId: string;
+  date: string;
   createdAt?: unknown;
 };
 
@@ -68,6 +79,21 @@ export default function TrackerApp() {
   const [fueled, setFueled] = useState(false);
   const [comment, setComment] = useState("");
   const [logs, setLogs] = useState<LogItem[]>([]);
+
+  const [isReservable, setIsReservable] = useState(false);
+  const [reservations, setReservations] = useState<Reservation[]>([]); 
+
+  const getWeekDates = () => {
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return dates;
+};
+
+const weekDates = getWeekDates();
 
   useEffect(() => {
   if (!auth || !db) return;
@@ -99,10 +125,11 @@ export default function TrackerApp() {
       const profile = userSnap.data() as UserProfile;
       setUserProfile(profile);
 
-      if (profile.companyId) {
-        await fetchVehicles(profile.companyId);
-        await fetchLogs(profile.companyId);
-      }
+     if (profile.companyId) {
+  await fetchVehicles(profile.companyId);
+  await fetchLogs(profile.companyId);
+  await fetchReservations(profile.companyId);
+}
     } catch (error) {
       console.error("ユーザー取得失敗", error);
     }
@@ -142,6 +169,21 @@ export default function TrackerApp() {
     );
     setLogs(list);
   };
+
+const fetchReservations = async (companyId: string) => {
+  if (!db) return;
+
+  const q = query(collection(db, "reservations"), where("companyId", "==", companyId));
+  const snap = await getDocs(q);
+  const list = snap.docs.map(
+    (item) =>
+      ({
+        id: item.id,
+        ...item.data(),
+      }) as Reservation
+  );
+  setReservations(list);
+};
 
   const handleSignUp = async () => {
     if (!auth) return;
