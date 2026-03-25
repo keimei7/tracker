@@ -71,6 +71,7 @@ export default function TrackerApp() {
   const [vehicleName, setVehicleName] = useState("");
   const [nickname, setNickname] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
+  const [isReservable, setIsReservable] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
@@ -80,20 +81,19 @@ export default function TrackerApp() {
   const [comment, setComment] = useState("");
   const [logs, setLogs] = useState<LogItem[]>([]);
 
-  const [isReservable, setIsReservable] = useState(false);
-  const [reservations, setReservations] = useState<Reservation[]>([]); 
+  const [reservations, setReservations] = useState<Reservation[]>([]);
 
   const getWeekDates = () => {
-  const dates: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
-  }
-  return dates;
-};
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      dates.push(d.toISOString().slice(0, 10));
+    }
+    return dates;
+  };
 
-const weekDates = getWeekDates();
+  const weekDates = getWeekDates();
 
   useEffect(() => {
   if (!auth || !db) return;
@@ -108,6 +108,7 @@ const weekDates = getWeekDates();
       setUserProfile(null);
       setVehicles([]);
       setLogs([]);
+      setReservations([]);
       return;
     }
 
@@ -119,17 +120,18 @@ const weekDates = getWeekDates();
         setUserProfile(null);
         setVehicles([]);
         setLogs([]);
+        setReservations([]);
         return;
       }
 
       const profile = userSnap.data() as UserProfile;
       setUserProfile(profile);
 
-     if (profile.companyId) {
-  await fetchVehicles(profile.companyId);
-  await fetchLogs(profile.companyId);
-  await fetchReservations(profile.companyId);
-}
+      if (profile.companyId) {
+        await fetchVehicles(profile.companyId);
+        await fetchLogs(profile.companyId);
+        await fetchReservations(profile.companyId);
+      }
     } catch (error) {
       console.error("ユーザー取得失敗", error);
     }
@@ -138,8 +140,7 @@ const weekDates = getWeekDates();
   return () => unsubscribe();
 }, []);
 
-   
-
+    
   const fetchVehicles = async (companyId: string) => {
     if (!db) return;
 
@@ -170,20 +171,24 @@ const weekDates = getWeekDates();
     setLogs(list);
   };
 
-const fetchReservations = async (companyId: string) => {
-  if (!db) return;
+  const fetchReservations = async (companyId: string) => {
+    if (!db) return;
 
-  const q = query(collection(db, "reservations"), where("companyId", "==", companyId));
-  const snap = await getDocs(q);
-  const list = snap.docs.map(
-    (item) =>
-      ({
-        id: item.id,
-        ...item.data(),
-      }) as Reservation
-  );
-  setReservations(list);
-};
+    const q = query(collection(db, "reservations"), where("companyId", "==", companyId));
+    const snap = await getDocs(q);
+    const list = snap.docs.map(
+      (item) =>
+        ({
+          id: item.id,
+          ...item.data(),
+        }) as Reservation
+    );
+    setReservations(list);
+  };
+
+  const getReservationForCell = (vehicleId: string, date: string) => {
+    return reservations.find((r) => r.vehicleId === vehicleId && r.date === date);
+  };
 
   const handleSignUp = async () => {
     if (!auth) return;
@@ -252,12 +257,14 @@ const fetchReservations = async (companyId: string) => {
         vehicleName: vehicleName.trim(),
         nickname: nickname.trim(),
         plateNumber: plateNumber.trim(),
+        isReservable,
         createdAt: serverTimestamp(),
       });
 
       setVehicleName("");
       setNickname("");
       setPlateNumber("");
+      setIsReservable(false);
 
       await fetchVehicles(userProfile.companyId);
     } catch (error) {
@@ -291,6 +298,44 @@ const fetchReservations = async (companyId: string) => {
       await fetchLogs(userProfile.companyId);
     } catch (error) {
       console.error("実績保存失敗", error);
+    }
+  };
+
+  const handleReserve = async (vehicleId: string, date: string) => {
+    if (!db || !userProfile?.companyId || !user?.uid) return;
+
+    const alreadyMine = reservations.find(
+      (r) => r.vehicleId === vehicleId && r.date === date && r.userId === user.uid
+    );
+
+    if (alreadyMine) {
+      try {
+        await deleteDoc(doc(db, "reservations", alreadyMine.id));
+        await fetchReservations(userProfile.companyId);
+      } catch (error) {
+        console.error("予約解除失敗", error);
+      }
+      return;
+    }
+
+    const alreadyTaken = reservations.find(
+      (r) => r.vehicleId === vehicleId && r.date === date
+    );
+
+    if (alreadyTaken) return;
+
+    try {
+      await addDoc(collection(db, "reservations"), {
+        companyId: userProfile.companyId,
+        userId: user.uid,
+        vehicleId,
+        date,
+        createdAt: serverTimestamp(),
+      });
+
+      await fetchReservations(userProfile.companyId);
+    } catch (error) {
+      console.error("予約失敗", error);
     }
   };
 
@@ -387,6 +432,88 @@ const fetchReservations = async (companyId: string) => {
           </div>
 
           <div style={cardStyle}>
+            <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 22 }}>予約画面</h2>
+
+            <div style={{ overflowX: "auto" }}>
+              <div
+                style={{
+                  minWidth: 560,
+                  display: "grid",
+                  gridTemplateColumns: "140px repeat(7, 1fr)",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <div></div>
+
+                {weekDates.map((date) => (
+                  <div
+                    key={date}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#374151",
+                      textAlign: "center",
+                      padding: "6px 4px",
+                    }}
+                  >
+                    {date.slice(5)}
+                  </div>
+                ))}
+
+                {vehicles
+                  .filter((vehicle) => vehicle.isReservable)
+                  .map((vehicle) => (
+                    <>
+                      <div
+                        key={`${vehicle.id}-label`}
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          background: "#f9fafb",
+                          border: "1px solid #e5e7eb",
+                          fontWeight: 700,
+                          fontSize: 14,
+                        }}
+                      >
+                        {vehicle.nickname || vehicle.vehicleName}
+                      </div>
+
+                      {weekDates.map((date) => {
+                        const reservation = getReservationForCell(vehicle.id, date);
+                        const isMine = reservation?.userId === user.uid;
+                        const isTaken = !!reservation;
+
+                        return (
+                          <button
+                            key={`${vehicle.id}-${date}`}
+                            onClick={() => handleReserve(vehicle.id, date)}
+                            disabled={isTaken && !isMine}
+                            style={{
+                              height: 44,
+                              borderRadius: 10,
+                              border: "1px solid #d1d5db",
+                              background: isMine ? "#0B4EA2" : isTaken ? "#e5e7eb" : "#ffffff",
+                              color: isMine ? "#ffffff" : "#111827",
+                              fontWeight: 700,
+                              cursor: isTaken && !isMine ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            {isMine ? "自分" : isTaken ? "埋" : "○"}
+                          </button>
+                        );
+                      })}
+                    </>
+                  ))}
+              </div>
+            </div>
+
+            <p style={{ marginTop: 12, marginBottom: 0, color: "#6b7280", fontSize: 13 }}>
+              青：自分の予約 / グレー：他ユーザー予約済み
+            </p>
+          </div>
+
+          <div style={cardStyle}>
             <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 22 }}>車両一覧</h2>
             {vehicles.length === 0 ? (
               <p style={{ margin: 0, color: "#6b7280" }}>まだ車両がありません</p>
@@ -408,6 +535,7 @@ const fetchReservations = async (companyId: string) => {
                     <div style={{ marginTop: 4, color: "#6b7280", fontSize: 14 }}>
                       {vehicle.nickname ? `${vehicle.vehicleName}` : ""}
                       {vehicle.plateNumber ? ` ・ ${vehicle.plateNumber}` : ""}
+                      {vehicle.isReservable ? " ・ 共有車" : ""}
                     </div>
                   </div>
                 ))}
@@ -537,6 +665,14 @@ const fetchReservations = async (companyId: string) => {
                 value={plateNumber}
                 onChange={(e) => setPlateNumber(e.target.value)}
               />
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={isReservable}
+                  onChange={(e) => setIsReservable(e.target.checked)}
+                />
+                共有車（予約対象）
+              </label>
               <button onClick={handleAddVehicle} style={primaryButtonStyle}>
                 車両を登録
               </button>
@@ -609,4 +745,4 @@ const fetchReservations = async (companyId: string) => {
       </div>
     </main>
   );
-}
+}　　
