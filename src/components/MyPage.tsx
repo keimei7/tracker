@@ -82,10 +82,29 @@ export default function MyPage() {
     transition: "all 0.15s ease",
   };
 
+  const overlayStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(17, 24, 39, 0.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    zIndex: 1000,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: 520,
+    background: "#ffffff",
+    borderRadius: 20,
+    padding: 20,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.20)",
+    border: "1px solid #e5e7eb",
+  };
+
   const today = new Date().toISOString().slice(0, 10);
 
-  // 仮仕様:
-  // isReservable でない車をマイカー候補として扱う
   const myCar = useMemo(() => {
     return core.vehicles.find((v) => !v.isReservable) || null;
   }, [core.vehicles]);
@@ -103,6 +122,28 @@ export default function MyPage() {
       .map((r) => core.vehicles.find((v) => v.id === r.vehicleId && v.isReservable))
       .filter(Boolean);
   }, [todaysReservations, core.vehicles]);
+
+  const openVehicleModal = (vehicle: any) => {
+    setActiveVehicle(vehicle);
+    core.setDestination("");
+    core.setDistance("");
+    core.setFueled(false);
+    core.setComment("");
+  };
+
+  const closeVehicleModal = () => {
+    setActiveVehicle(null);
+    core.setDestination("");
+    core.setDistance("");
+    core.setFueled(false);
+    core.setComment("");
+  };
+
+  const saveLogAndClose = async () => {
+    if (!activeVehicle) return;
+    await core.handleAddLog(activeVehicle.id);
+    closeVehicleModal();
+  };
 
   if (!core.user) {
     return (
@@ -206,21 +247,10 @@ export default function MyPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {myCar ? (
               <div
-                onClick={() => {
-                  setActiveVehicle(myCar);
-                  core.setDestination("");
-                  core.setDistance("");
-                  core.setFueled(false);
-                  core.setComment("");
-                }}
+                onClick={() => openVehicleModal(myCar)}
                 style={{
                   ...vehicleCardBaseStyle,
-                  border:
-                    activeVehicle?.id === myCar.id
-                      ? "2px solid #0B4EA2"
-                      : "1px solid #e5e7eb",
-                  background:
-                    activeVehicle?.id === myCar.id ? "#eff6ff" : "#ffffff",
+                  border: "1px solid #e5e7eb",
                 }}
               >
                 <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>
@@ -250,21 +280,10 @@ export default function MyPage() {
             {todaysReservedVehicles.map((vehicle: any) => (
               <div
                 key={vehicle.id}
-                onClick={() => {
-                  setActiveVehicle(vehicle);
-                  core.setDestination("");
-                  core.setDistance("");
-                  core.setFueled(false);
-                  core.setComment("");
-                }}
+                onClick={() => openVehicleModal(vehicle)}
                 style={{
                   ...vehicleCardBaseStyle,
-                  border:
-                    activeVehicle?.id === vehicle.id
-                      ? "2px solid #0B4EA2"
-                      : "1px solid #e5e7eb",
-                  background:
-                    activeVehicle?.id === vehicle.id ? "#eff6ff" : "#ffffff",
+                  border: "1px solid #e5e7eb",
                 }}
               >
                 <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>
@@ -296,56 +315,78 @@ export default function MyPage() {
         </div>
 
         {activeVehicle && (
-          <div style={cardStyle}>
-            <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 22 }}>今日の入力</h2>
-
-            <div style={{ marginBottom: 16, color: "#6b7280", fontSize: 14 }}>
-              入力対象：{activeVehicle.nickname || activeVehicle.vehicleName}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <input
-                style={inputStyle}
-                type="text"
-                placeholder="行先"
-                value={core.destination}
-                onChange={(e) => core.setDestination(e.target.value)}
-              />
-
-              <input
-                style={inputStyle}
-                type="number"
-                placeholder="走行距離（km）"
-                value={core.distance}
-                onChange={(e) => core.setDistance(e.target.value)}
-              />
-
-              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={core.fueled}
-                  onChange={(e) => core.setFueled(e.target.checked)}
-                />
-                給油あり
-              </label>
-
-              <input
-                style={inputStyle}
-                type="text"
-                placeholder="コメント（任意）"
-                value={core.comment}
-                onChange={(e) => core.setComment(e.target.value)}
-              />
-
-              <button
-                onClick={() => {
-                  core.handleAddLog(activeVehicle.id);
-                  setActiveVehicle(null);
+          <div style={overlayStyle} onClick={closeVehicleModal}>
+            <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 16,
                 }}
-                style={primaryButtonStyle}
               >
-                今日の記録を保存
-              </button>
+                <div>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 4 }}>
+                    今日の入力
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: 22 }}>
+                    {activeVehicle.nickname || activeVehicle.vehicleName}
+                  </div>
+                </div>
+
+                <button
+                  onClick={closeVehicleModal}
+                  style={{
+                    border: "1px solid #d1d5db",
+                    background: "#fff",
+                    borderRadius: 10,
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  閉じる
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <input
+                  style={inputStyle}
+                  type="text"
+                  placeholder="行先"
+                  value={core.destination}
+                  onChange={(e) => core.setDestination(e.target.value)}
+                />
+
+                <input
+                  style={inputStyle}
+                  type="number"
+                  placeholder="走行距離（km）"
+                  value={core.distance}
+                  onChange={(e) => core.setDistance(e.target.value)}
+                />
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={core.fueled}
+                    onChange={(e) => core.setFueled(e.target.checked)}
+                  />
+                  給油あり
+                </label>
+
+                <input
+                  style={inputStyle}
+                  type="text"
+                  placeholder="コメント（任意）"
+                  value={core.comment}
+                  onChange={(e) => core.setComment(e.target.value)}
+                />
+
+                <button onClick={saveLogAndClose} style={primaryButtonStyle}>
+                  今日の記録を保存
+                </button>
+              </div>
             </div>
           </div>
         )}
