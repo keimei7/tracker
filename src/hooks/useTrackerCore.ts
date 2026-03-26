@@ -36,7 +36,6 @@ export function useTrackerCore() {
   const [isReservable, setIsReservable] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
-  const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [destination, setDestination] = useState("");
   const [distance, setDistance] = useState("");
   const [fueled, setFueled] = useState(false);
@@ -60,10 +59,9 @@ export function useTrackerCore() {
   useEffect(() => {
     if (!auth || !db) return;
 
-    const authInstance = auth;
     const dbInstance = db;
 
-    const unsubscribe = onAuthStateChanged(authInstance, async (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
 
       if (!u) {
@@ -104,6 +102,7 @@ export function useTrackerCore() {
 
   const fetchVehicles = async (companyId: string) => {
     if (!db) return;
+
     const q = query(collection(db, "vehicles"), where("companyId", "==", companyId));
     const snap = await getDocs(q);
     const list = snap.docs.map(
@@ -118,6 +117,7 @@ export function useTrackerCore() {
 
   const fetchLogs = async (companyId: string) => {
     if (!db) return;
+
     const q = query(collection(db, "logs"), where("companyId", "==", companyId));
     const snap = await getDocs(q);
     const list = snap.docs.map(
@@ -132,6 +132,7 @@ export function useTrackerCore() {
 
   const fetchReservations = async (companyId: string) => {
     if (!db) return;
+
     const q = query(collection(db, "reservations"), where("companyId", "==", companyId));
     const snap = await getDocs(q);
     const list = snap.docs.map(
@@ -150,6 +151,7 @@ export function useTrackerCore() {
 
   const handleSignUp = async () => {
     if (!auth) return;
+
     try {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (error) {
@@ -159,6 +161,7 @@ export function useTrackerCore() {
 
   const handleLogin = async () => {
     if (!auth) return;
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
@@ -228,15 +231,15 @@ export function useTrackerCore() {
     }
   };
 
-  const handleAddLog = async () => {
+  const handleAddLog = async (vehicleId: string) => {
     if (!db || !userProfile?.companyId || !user?.uid) return;
-    if (!selectedVehicleId || !destination.trim()) return;
+    if (!vehicleId || !destination.trim()) return;
 
     try {
       await addDoc(collection(db, "logs"), {
         companyId: userProfile.companyId,
         userId: user.uid,
-        vehicleId: selectedVehicleId,
+        vehicleId,
         date: new Date().toISOString().slice(0, 10),
         destination: destination.trim(),
         distance: distance ? Number(distance) : 0,
@@ -245,7 +248,6 @@ export function useTrackerCore() {
         createdAt: serverTimestamp(),
       });
 
-      setSelectedVehicleId("");
       setDestination("");
       setDistance("");
       setFueled(false);
@@ -315,8 +317,7 @@ export function useTrackerCore() {
     setIsReservable,
     vehicles,
 
-    selectedVehicleId,
-    setSelectedVehicleId,
+    
     destination,
     setDestination,
     distance,

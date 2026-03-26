@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTrackerCore } from "@/src/hooks/useTrackerCore";
 
 export default function MyPage() {
   const core = useTrackerCore();
+  const [activeVehicle, setActiveVehicle] = useState<any>(null);
 
   const pageStyle: React.CSSProperties = {
     minHeight: "100vh",
@@ -83,6 +84,8 @@ export default function MyPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // 仮仕様:
+  // isReservable でない車をマイカー候補として扱う
   const myCar = useMemo(() => {
     return core.vehicles.find((v) => !v.isReservable) || null;
   }, [core.vehicles]);
@@ -203,15 +206,21 @@ export default function MyPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {myCar ? (
               <div
-                onClick={() => core.setSelectedVehicleId(myCar.id)}
+                onClick={() => {
+                  setActiveVehicle(myCar);
+                  core.setDestination("");
+                  core.setDistance("");
+                  core.setFueled(false);
+                  core.setComment("");
+                }}
                 style={{
                   ...vehicleCardBaseStyle,
                   border:
-                    core.selectedVehicleId === myCar.id
+                    activeVehicle?.id === myCar.id
                       ? "2px solid #0B4EA2"
                       : "1px solid #e5e7eb",
                   background:
-                    core.selectedVehicleId === myCar.id ? "#eff6ff" : "#ffffff",
+                    activeVehicle?.id === myCar.id ? "#eff6ff" : "#ffffff",
                 }}
               >
                 <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>
@@ -241,15 +250,21 @@ export default function MyPage() {
             {todaysReservedVehicles.map((vehicle: any) => (
               <div
                 key={vehicle.id}
-                onClick={() => core.setSelectedVehicleId(vehicle.id)}
+                onClick={() => {
+                  setActiveVehicle(vehicle);
+                  core.setDestination("");
+                  core.setDistance("");
+                  core.setFueled(false);
+                  core.setComment("");
+                }}
                 style={{
                   ...vehicleCardBaseStyle,
                   border:
-                    core.selectedVehicleId === vehicle.id
+                    activeVehicle?.id === vehicle.id
                       ? "2px solid #0B4EA2"
                       : "1px solid #e5e7eb",
                   background:
-                    core.selectedVehicleId === vehicle.id ? "#eff6ff" : "#ffffff",
+                    activeVehicle?.id === vehicle.id ? "#eff6ff" : "#ffffff",
                 }}
               >
                 <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>
@@ -280,14 +295,12 @@ export default function MyPage() {
           </div>
         </div>
 
-        {core.selectedVehicleId && (
+        {activeVehicle && (
           <div style={cardStyle}>
             <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 22 }}>今日の入力</h2>
 
             <div style={{ marginBottom: 16, color: "#6b7280", fontSize: 14 }}>
-              選択中：
-              {core.vehicles.find((v) => v.id === core.selectedVehicleId)?.nickname ||
-                core.vehicles.find((v) => v.id === core.selectedVehicleId)?.vehicleName}
+              入力対象：{activeVehicle.nickname || activeVehicle.vehicleName}
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -324,7 +337,13 @@ export default function MyPage() {
                 onChange={(e) => core.setComment(e.target.value)}
               />
 
-              <button onClick={core.handleAddLog} style={primaryButtonStyle}>
+              <button
+                onClick={() => {
+                  core.handleAddLog(activeVehicle.id);
+                  setActiveVehicle(null);
+                }}
+                style={primaryButtonStyle}
+              >
                 今日の記録を保存
               </button>
             </div>
