@@ -119,11 +119,28 @@ const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1)
     );
   }, [core.reservations, core.user, today]);
 
-  const todaysReservedVehicles = useMemo(() => {
-    return todaysReservations
-      .map((r) => core.vehicles.find((v) => v.id === r.vehicleId && v.isReservable))
-      .filter(Boolean);
-  }, [todaysReservations, core.vehicles]);
+  const todaysReservedItems = useMemo(() => {
+  return todaysReservations
+    .map((reservation) => {
+      const vehicle = core.vehicles.find(
+        (v) => v.id === reservation.vehicleId && v.isReservable
+      );
+
+      if (!vehicle) return null;
+
+      return { reservation, vehicle };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        reservation: (typeof todaysReservations)[number];
+        vehicle: NonNullable<
+          ReturnType<typeof core.vehicles.find>
+        >;
+      } => item !== null
+    );
+}, [todaysReservations, core.vehicles]);
 
   const openVehicleModal = (vehicle: any) => {
     setActiveVehicle(vehicle);
@@ -279,29 +296,49 @@ const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1)
               </div>
             )}
 
-            {todaysReservedVehicles.map((vehicle: any) => (
-              <div
-                key={vehicle.id}
-                onClick={() => openVehicleModal(vehicle)}
-                style={{
-                  ...vehicleCardBaseStyle,
-                  border: "1px solid #e5e7eb",
-                }}
-              >
-                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>
-                  予約車
-                </div>
-                <div style={{ fontWeight: 700, fontSize: 18 }}>
-                  {vehicle.nickname || vehicle.vehicleName}
-                </div>
-                <div style={{ marginTop: 4, color: "#6b7280", fontSize: 14 }}>
-                  {vehicle.nickname ? vehicle.vehicleName : ""}
-                  {vehicle.plateNumber ? ` ・ ${vehicle.plateNumber}` : ""}
-                </div>
-              </div>
-            ))}
+            {todaysReservedItems.map(({ vehicle, reservation }) => (
+  <div
+    key={vehicle.id}
+    onClick={() => {
+      setActiveVehicle(vehicle);
+      core.setDestination(reservation.destination || "");
+      core.setPurpose(reservation.purpose || "");
+      core.setDistance("");
+      core.setFueled(false);
+      core.setComment("");
+    }}
+    style={{
+      ...vehicleCardBaseStyle,
+      border:
+        activeVehicle?.id === vehicle.id
+          ? "2px solid #0B4EA2"
+          : "1px solid #e5e7eb",
+      background:
+        activeVehicle?.id === vehicle.id ? "#eff6ff" : "#ffffff",
+    }}
+  >
+    <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>
+      予約車
+    </div>
+    <div style={{ fontWeight: 700, fontSize: 18 }}>
+      {vehicle.nickname || vehicle.vehicleName}
+    </div>
+    <div style={{ marginTop: 4, color: "#6b7280", fontSize: 14 }}>
+      {vehicle.nickname ? vehicle.vehicleName : ""}
+      {vehicle.plateNumber ? ` ・ ${vehicle.plateNumber}` : ""}
+    </div>
 
-            {!myCar && todaysReservedVehicles.length === 0 && (
+    {(reservation.destination || reservation.purpose) && (
+      <div style={{ marginTop: 8, color: "#6b7280", fontSize: 13 }}>
+        {reservation.destination ? `行き先: ${reservation.destination}` : ""}
+        {reservation.destination && reservation.purpose ? " ・ " : ""}
+        {reservation.purpose ? `用途: ${reservation.purpose}` : ""}
+      </div>
+    )}
+  </div>
+))}
+
+          {!myCar && todaysReservedItems.length === 0 && (
               <div
                 style={{
                   ...vehicleCardBaseStyle,
