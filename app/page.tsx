@@ -1,7 +1,5 @@
-"use client";
-
-import TrackerApp from "../src/components/TrackerApp";
+import MyPage from "@/src/components/MyPage";
 
 export default function Page() {
-  return <TrackerApp />;
+  return <MyPage />;
 }
