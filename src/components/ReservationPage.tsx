@@ -46,10 +46,78 @@ export default function ReservationPage() {
     justifyContent: "center",
   };
 
+  const overlayStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(17, 24, 39, 0.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    zIndex: 1000,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: 520,
+    background: "#ffffff",
+    borderRadius: 20,
+    padding: 20,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.20)",
+    border: "1px solid #e5e7eb",
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1px solid #d1d5db",
+    background: "#fff",
+    fontSize: 16,
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
+  const primaryButtonStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "none",
+    background: "#0B4EA2",
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: 15,
+    cursor: "pointer",
+  };
+
+  const secondaryButtonStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#111827",
+    fontWeight: 600,
+    fontSize: 15,
+    cursor: "pointer",
+  };
+
+  const dangerButtonStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1px solid #ef4444",
+    background: "#fff",
+    color: "#ef4444",
+    fontWeight: 700,
+    fontSize: 15,
+    cursor: "pointer",
+  };
+
   const getStartOfWeek = (date: Date) => {
     const d = new Date(date);
     const day = d.getDay();
-    const diff = day === 0 ? -6 : 1 - day; // 月曜始まり
+    const diff = day === 0 ? -6 : 1 - day;
     d.setDate(d.getDate() + diff);
     d.setHours(0, 0, 0, 0);
     return d;
@@ -86,6 +154,18 @@ export default function ReservationPage() {
     return core.vehicles.filter((v) => v.isReservable);
   }, [core.vehicles]);
 
+  const editingReservation = useMemo(() => {
+    if (!core.reservationTargetVehicleId || !core.reservationTargetDate) return null;
+    return core.getReservationForCell(
+      core.reservationTargetVehicleId,
+      core.reservationTargetDate
+    );
+  }, [
+    core,
+    core.reservationTargetVehicleId,
+    core.reservationTargetDate,
+  ]);
+
   if (!core.user || !core.userProfile?.companyId) {
     return (
       <main style={pageStyle}>
@@ -118,27 +198,15 @@ export default function ReservationPage() {
               marginBottom: 20,
             }}
           >
-            <button
-              onClick={() => setWeekOffset((prev) => prev - 1)}
-              style={navButtonStyle}
-            >
+            <button onClick={() => setWeekOffset((prev) => prev - 1)} style={navButtonStyle}>
               ←
             </button>
 
-            <div
-              style={{
-                textAlign: "center",
-                fontSize: 28,
-                fontWeight: 800,
-              }}
-            >
+            <div style={{ textAlign: "center", fontSize: 28, fontWeight: 800 }}>
               {weekTitle}
             </div>
 
-            <button
-              onClick={() => setWeekOffset((prev) => prev + 1)}
-              style={navButtonStyle}
-            >
+            <button onClick={() => setWeekOffset((prev) => prev + 1)} style={navButtonStyle}>
               →
             </button>
           </div>
@@ -185,9 +253,8 @@ export default function ReservationPage() {
               ))}
 
               {reservableVehicles.map((vehicle) => (
-                <>
+                <div key={vehicle.id} style={{ display: "contents" }}>
                   <div
-                    key={`${vehicle.id}-name`}
                     style={{
                       borderRight: "1px solid #d1d5db",
                       borderBottom: "1px solid #d1d5db",
@@ -227,7 +294,10 @@ export default function ReservationPage() {
                         }}
                       >
                         <button
-                          onClick={() => core.handleReserve(vehicle.id, dateKey)}
+                          onClick={() => {
+                            if (isTaken && !isMine) return;
+                            core.openReservationModal(vehicle.id, dateKey);
+                          }}
                           disabled={isTaken && !isMine}
                           style={{
                             width: "100%",
@@ -254,8 +324,12 @@ export default function ReservationPage() {
                         >
                           {isMine ? (
                             <>
-                              <div style={{ fontSize: 24, fontWeight: 800 }}>自分</div>
-                              <div style={{ fontSize: 14, opacity: 0.9 }}>タップで解除</div>
+                              <div style={{ fontSize: 18, fontWeight: 800 }}>
+                                {reservation?.destination || "自分"}
+                              </div>
+                              <div style={{ fontSize: 13, opacity: 0.9 }}>
+                                {reservation?.purpose || "タップで編集"}
+                              </div>
                             </>
                           ) : isTaken ? (
                             <>
@@ -275,7 +349,7 @@ export default function ReservationPage() {
                       </div>
                     );
                   })}
-                </>
+                </div>
               ))}
             </div>
           </div>
@@ -284,6 +358,90 @@ export default function ReservationPage() {
             青：自分の予約　/　グレー：他ユーザー予約済み
           </div>
         </div>
+
+        {core.reservationModalOpen && (
+          <div style={overlayStyle} onClick={core.closeReservationModal}>
+            <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 4 }}>
+                    予約入力
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: 22 }}>
+                    {reservableVehicles.find(
+                      (v) => v.id === core.reservationTargetVehicleId
+                    )?.nickname ||
+                      reservableVehicles.find(
+                        (v) => v.id === core.reservationTargetVehicleId
+                      )?.vehicleName}
+                  </div>
+                  <div style={{ marginTop: 4, color: "#6b7280", fontSize: 14 }}>
+                    {core.reservationTargetDate}
+                  </div>
+                </div>
+
+                <button
+                  onClick={core.closeReservationModal}
+                  style={{
+                    border: "1px solid #d1d5db",
+                    background: "#fff",
+                    borderRadius: 10,
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  閉じる
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <input
+                  style={inputStyle}
+                  type="text"
+                  placeholder="行き先"
+                  value={core.reservationDestination}
+                  onChange={(e) => core.setReservationDestination(e.target.value)}
+                />
+
+                <input
+                  style={inputStyle}
+                  type="text"
+                  placeholder="用途"
+                  value={core.reservationPurpose}
+                  onChange={(e) => core.setReservationPurpose(e.target.value)}
+                />
+
+                <button onClick={core.handleSaveReservation} style={primaryButtonStyle}>
+                  予約を保存
+                </button>
+
+                {editingReservation && editingReservation.userId === core.user.uid && (
+  <button
+    onClick={() => core.handleDeleteReservation(editingReservation.id)}
+    style={dangerButtonStyle}
+  >
+    予約を解除
+  </button>
+)}
+
+                <button
+                  onClick={core.closeReservationModal}
+                  style={secondaryButtonStyle}
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

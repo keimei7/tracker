@@ -12,6 +12,7 @@ export type Vehicle = {
   nickname?: string;
   plateNumber?: string;
   isReservable?: boolean;
+  inspectionDate?: string;
   createdAt?: unknown;
 };
 
@@ -22,6 +23,7 @@ export type LogItem = {
   vehicleId: string;
   date: string;
   destination: string;
+  purpose?: string;
   distance: number;
   fueled: boolean;
   comment?: string;
@@ -34,5 +36,7 @@ export type Reservation = {
   userId: string;
   vehicleId: string;
   date: string;
+  destination?: string;
+  purpose?: string;
   createdAt?: unknown;
 };

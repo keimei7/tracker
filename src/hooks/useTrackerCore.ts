@@ -34,15 +34,23 @@ export function useTrackerCore() {
   const [nickname, setNickname] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
   const [isReservable, setIsReservable] = useState(false);
+  const [inspectionDate, setInspectionDate] = useState("");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   const [destination, setDestination] = useState("");
+  const [purpose, setPurpose] = useState("");
   const [distance, setDistance] = useState("");
   const [fueled, setFueled] = useState(false);
   const [comment, setComment] = useState("");
   const [logs, setLogs] = useState<LogItem[]>([]);
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  const [reservationModalOpen, setReservationModalOpen] = useState(false);
+  const [reservationTargetVehicleId, setReservationTargetVehicleId] = useState("");
+  const [reservationTargetDate, setReservationTargetDate] = useState("");
+  const [reservationDestination, setReservationDestination] = useState("");
+  const [reservationPurpose, setReservationPurpose] = useState("");
 
   const getWeekDates = () => {
     const dates: string[] = [];
@@ -217,6 +225,7 @@ export function useTrackerCore() {
         nickname: nickname.trim(),
         plateNumber: plateNumber.trim(),
         isReservable,
+        inspectionDate: inspectionDate || "",
         createdAt: serverTimestamp(),
       });
 
@@ -224,6 +233,7 @@ export function useTrackerCore() {
       setNickname("");
       setPlateNumber("");
       setIsReservable(false);
+      setInspectionDate("");
 
       await fetchVehicles(userProfile.companyId);
     } catch (error) {
@@ -242,6 +252,7 @@ export function useTrackerCore() {
         vehicleId,
         date: new Date().toISOString().slice(0, 10),
         destination: destination.trim(),
+        purpose: purpose.trim(),
         distance: distance ? Number(distance) : 0,
         fueled,
         comment: comment.trim(),
@@ -249,6 +260,7 @@ export function useTrackerCore() {
       });
 
       setDestination("");
+      setPurpose("");
       setDistance("");
       setFueled(false);
       setComment("");
@@ -259,41 +271,66 @@ export function useTrackerCore() {
     }
   };
 
-  const handleReserve = async (vehicleId: string, date: string) => {
+  const openReservationModal = (vehicleId: string, date: string) => {
+    const existing = getReservationForCell(vehicleId, date);
+
+    setReservationTargetVehicleId(vehicleId);
+    setReservationTargetDate(date);
+    setReservationDestination(existing?.destination || "");
+    setReservationPurpose(existing?.purpose || "");
+    setReservationModalOpen(true);
+  };
+
+  const closeReservationModal = () => {
+    setReservationModalOpen(false);
+    setReservationTargetVehicleId("");
+    setReservationTargetDate("");
+    setReservationDestination("");
+    setReservationPurpose("");
+  };
+
+  const handleSaveReservation = async () => {
     if (!db || !userProfile?.companyId || !user?.uid) return;
+    if (!reservationTargetVehicleId || !reservationTargetDate) return;
 
-    const alreadyMine = reservations.find(
-      (r) => r.vehicleId === vehicleId && r.date === date && r.userId === user.uid
+    const existingMine = reservations.find(
+      (r) =>
+        r.vehicleId === reservationTargetVehicleId &&
+        r.date === reservationTargetDate &&
+        r.userId === user.uid
     );
-
-    if (alreadyMine) {
-      try {
-        await deleteDoc(doc(db, "reservations", alreadyMine.id));
-        await fetchReservations(userProfile.companyId);
-      } catch (error) {
-        console.error("予約解除失敗", error);
-      }
-      return;
-    }
-
-    const alreadyTaken = reservations.find(
-      (r) => r.vehicleId === vehicleId && r.date === date
-    );
-
-    if (alreadyTaken) return;
 
     try {
+      if (existingMine) {
+        await deleteDoc(doc(db, "reservations", existingMine.id));
+      }
+
       await addDoc(collection(db, "reservations"), {
         companyId: userProfile.companyId,
         userId: user.uid,
-        vehicleId,
-        date,
+        vehicleId: reservationTargetVehicleId,
+        date: reservationTargetDate,
+        destination: reservationDestination.trim(),
+        purpose: reservationPurpose.trim(),
         createdAt: serverTimestamp(),
       });
 
       await fetchReservations(userProfile.companyId);
+      closeReservationModal();
     } catch (error) {
-      console.error("予約失敗", error);
+      console.error("予約保存失敗", error);
+    }
+  };
+
+  const handleDeleteReservation = async (reservationId: string) => {
+    if (!db || !userProfile?.companyId) return;
+
+    try {
+      await deleteDoc(doc(db, "reservations", reservationId));
+      await fetchReservations(userProfile.companyId);
+      closeReservationModal();
+    } catch (error) {
+      console.error("予約解除失敗", error);
     }
   };
 
@@ -315,11 +352,14 @@ export function useTrackerCore() {
     setPlateNumber,
     isReservable,
     setIsReservable,
+    inspectionDate,
+    setInspectionDate,
     vehicles,
 
-    
     destination,
     setDestination,
+    purpose,
+    setPurpose,
     distance,
     setDistance,
     fueled,
@@ -332,12 +372,24 @@ export function useTrackerCore() {
     weekDates,
     getReservationForCell,
 
+    reservationModalOpen,
+    reservationTargetVehicleId,
+    reservationTargetDate,
+    reservationDestination,
+    setReservationDestination,
+    reservationPurpose,
+    setReservationPurpose,
+
     handleSignUp,
     handleLogin,
     handleLogout,
     handleCreateCompany,
     handleAddVehicle,
     handleAddLog,
-    handleReserve,
+
+    openReservationModal,
+    closeReservationModal,
+    handleSaveReservation,
+    handleDeleteReservation,
   };
 }
