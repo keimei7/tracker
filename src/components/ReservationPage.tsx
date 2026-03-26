@@ -139,10 +139,12 @@ export default function ReservationPage() {
     return `${start.getFullYear()}/${start.getMonth() + 1}/${start.getDate()} 週`;
   }, [weekDates]);
 
-  const formatDateKey = (date: Date) => {
-    return date.toISOString().slice(0, 10);
-  };
-
+ const formatDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
   const formatDayLabel = (date: Date) => {
     const month = date.getMonth() + 1;
     const day = date.getDate();

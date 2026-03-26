@@ -23,6 +23,12 @@ import {
 import type { UserProfile, Vehicle, LogItem, Reservation } from "@/src/lib/trackerTypes";
 
 export function useTrackerCore() {
+    const formatLocalDate = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -53,14 +59,14 @@ export function useTrackerCore() {
   const [reservationPurpose, setReservationPurpose] = useState("");
 
   const getWeekDates = () => {
-    const dates: string[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
-    }
-    return dates;
-  };
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    dates.push(formatLocalDate(d));
+  }
+  return dates;
+};
 
   const weekDates = getWeekDates();
 
@@ -250,7 +256,7 @@ export function useTrackerCore() {
         companyId: userProfile.companyId,
         userId: user.uid,
         vehicleId,
-        date: new Date().toISOString().slice(0, 10),
+      date: formatLocalDate(new Date()),
         destination: destination.trim(),
         purpose: purpose.trim(),
         distance: distance ? Number(distance) : 0,

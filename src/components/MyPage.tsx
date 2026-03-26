@@ -103,7 +103,9 @@ export default function MyPage() {
     border: "1px solid #e5e7eb",
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+ const todayDate = new Date();
+const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1)
+    .padStart(2, "0")}-${String(todayDate.getDate()).padStart(2, "0")}`;
 
   const myCar = useMemo(() => {
     return core.vehicles.find((v) => !v.isReservable) || null;
